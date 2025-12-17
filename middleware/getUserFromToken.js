@@ -1,19 +1,22 @@
-import { getUserById } from "#db/queries/users";
-import { verifyToken } from "#utils/jwt";
+import jwt from "jsonwebtoken";
 
-/** Attaches the user to the request if a valid token is provided */
-export default async function getUserFromToken(req, res, next) {
-  const authorization = req.get("authorization");
-  if (!authorization || !authorization.startsWith("Bearer ")) return next();
+const JWT_SECRET = process.env.JWT_SECRET ?? "dev-secret";
 
-  const token = authorization.split(" ")[1];
-  try {
-    const { id } = verifyToken(token);
-    const user = await getUserById(id);
-    req.user = user;
-    next();
-  } catch (e) {
-    console.error(e);
-    res.status(401).send("Invalid token.");
+export default function getUserFromToken(req, res, next) {
+  const auth = req.header("Authorization") || "";
+  const [, token] = auth.split(" ");
+
+  if (!token) {
+    req.user = null;
+    return next();
   }
+
+  try {
+    const payload = jwt.verify(token, JWT_SECRET, { encoding: "base64" });
+    req.user = payload;
+  } catch {
+    req.user = null;
+  }
+
+  next();
 }
